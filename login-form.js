@@ -104,15 +104,39 @@ class LoginForm extends HTMLElement {
       `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`;
   }
 
-  // Generates a cryptographically random hex string to use as the __user token
-  _generateUserToken() {
-    const bytes = new Uint8Array(32);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+  // Generates a signed HS256 JWT using a per-session random key via Web Crypto
+  async _generateUserToken() {
+    const b64url = (buf) =>
+      btoa(String.fromCharCode(...new Uint8Array(buf)))
+        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+    const encode = (obj) => b64url(new TextEncoder().encode(JSON.stringify(obj)));
+
+    const header  = encode({ alg: "HS256", typ: "JWT" });
+    const payload = encode({
+      iat: Math.floor(Date.now() / 1000),
+      jti: crypto.randomUUID(),
+      session: true
+    });
+
+    const signingKey = await crypto.subtle.generateKey(
+      { name: "HMAC", hash: "SHA-256" },
+      false, // non-extractable — key exists in memory only for this session
+      ["sign"]
+    );
+
+    const sigBuf    = await crypto.subtle.sign(
+      "HMAC",
+      signingKey,
+      new TextEncoder().encode(`${header}.${payload}`)
+    );
+
+    const signature = b64url(sigBuf);
+    return `${header}.${payload}.${signature}`;
   }
 
-  _setUserSessionCookie() {
-    const token = this._generateUserToken();
+  async _setUserSessionCookie() {
+    const token = await this._generateUserToken();
     // Session-length cookie (no Max-Age = expires when browser closes)
     const secure = location.protocol === "https:" ? "; Secure" : "";
     document.cookie = `__user=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`;
@@ -216,7 +240,7 @@ class LoginForm extends HTMLElement {
       }
 
       // Set the client-side session indicator cookie
-      this._setUserSessionCookie();
+      await this._setUserSessionCookie();
 
       this._setText(successEl, "Logged in successfully.");
       window.location.href = "/";
