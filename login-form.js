@@ -75,12 +75,12 @@ class LoginForm extends HTMLElement {
               <div class="button-glide-over__background"></div>
             </a>
           </div>
-          <div class="form_message-success-wrapper w-form-done">
+          <div class="form_message-success-wrapper">
             <div class="form_message-success">
               <div data-login-success="true"></div>
             </div>
           </div>
-          <div class="form_message-error-wrapper w-form-fail">
+          <div class="form_message-error-wrapper">
             <div class="form_message-error">
               <div data-login-error="true"></div>
             </div>
