@@ -56,7 +56,7 @@ class LoginForm extends HTMLElement {
           />
 
           <div class="button-group is-center">
-            <a data-wf--main-cta-button--variant="no-bg" href="#" class="button-glide-over w-inline-block" id="go-to-register">
+            <a href="#" class="button-glide-over w-inline-block" id="go-to-register">
               <span class="button-glide-over__container">
                 <span class="button-glide-over__icon is-first">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-hidden="true" style="--index:3;" class="button-glide-over__icon-item"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="24" d="M40 128h176M144 56l72 72-72 72"></path></svg>
@@ -75,17 +75,22 @@ class LoginForm extends HTMLElement {
               <div class="button-glide-over__background"></div>
             </a>
           </div>
-          <div class="form_message-success-wrapper">
-            <div class="form_message-success">
-              <div data-login-success="true"></div>
-            </div>
-          </div>
-          <div class="form_message-error-wrapper">
-            <div class="form_message-error">
-              <div data-login-error="true"></div>
-            </div>
+        </div>
+
+        <!-- Success message -->
+        <div class="form_message-success-wrapper w-form-done" data-login-success-wrapper="true" style="display:none">
+          <div class="form_message-success">
+            <div data-login-success="true"></div>
           </div>
         </div>
+
+        <!-- Error message -->
+        <div class="form_message-error-wrapper w-form-fail" data-login-error-wrapper="true" style="display:none">
+          <div class="form_message-error">
+            <div data-login-error="true"></div>
+          </div>
+        </div>
+
       </form>
     `;
 
@@ -170,15 +175,45 @@ class LoginForm extends HTMLElement {
     return el;
   }
 
-  _setText(el, text) {
-    if (!el) return;
-    el.textContent = text;
-    el.style.display = "block";
+  _showMessage(type, text) {
+    const isSuccess    = type === "success";
+    const wrapperAttr  = isSuccess ? "[data-login-success-wrapper]" : "[data-login-error-wrapper]";
+    const messageAttr  = isSuccess ? "[data-login-success]"         : "[data-login-error]";
+    const activeClass  = isSuccess ? "w-form-done"                  : "w-form-fail";
+    const otherAttr    = isSuccess ? "[data-login-error-wrapper]"   : "[data-login-success-wrapper]";
+    const otherClass   = isSuccess ? "w-form-fail"                  : "w-form-done";
+
+    const wrapper    = this.querySelector(wrapperAttr);
+    const messageEl  = this.querySelector(messageAttr);
+    const otherWrap  = this.querySelector(otherAttr);
+
+    // Hide the opposite wrapper
+    if (otherWrap) {
+      otherWrap.classList.remove(otherClass);
+      otherWrap.style.display = "none";
+    }
+
+    // Show this wrapper
+    if (wrapper) {
+      wrapper.classList.add(activeClass);
+      wrapper.style.display = "block";
+    }
+
+    if (messageEl) messageEl.textContent = text;
   }
 
-  _hide(el) {
-    if (!el) return;
-    el.style.display = "none";
+  _hideMessages() {
+    const successWrapper = this.querySelector("[data-login-success-wrapper]");
+    const errorWrapper   = this.querySelector("[data-login-error-wrapper]");
+
+    if (successWrapper) {
+      successWrapper.classList.remove("w-form-done");
+      successWrapper.style.display = "none";
+    }
+    if (errorWrapper) {
+      errorWrapper.classList.remove("w-form-fail");
+      errorWrapper.style.display = "none";
+    }
   }
 
   _setSubmitState(submitBtn, loading) {
@@ -197,18 +232,15 @@ class LoginForm extends HTMLElement {
     e.stopPropagation();
 
     const form      = e.currentTarget;
-    const errorEl   = form.querySelector('[data-login-error="true"]');
-    const successEl = form.querySelector('[data-login-success="true"]');
     const submitBtn = form.querySelector('input[type="submit"], button[type="submit"]');
 
-    this._hide(errorEl);
-    this._hide(successEl);
+    this._hideMessages();
 
     const email    = (form.querySelector('[data-login-email="true"]')?.value || "").trim();
     const password = form.querySelector('[data-login-password="true"]')?.value || "";
 
     if (!email || !password) {
-      this._setText(errorEl, "Please enter your email and password.");
+      this._showMessage("error", "Please enter your email and password.");
       return;
     }
 
@@ -235,18 +267,18 @@ class LoginForm extends HTMLElement {
 
       if (!res.ok) {
         const msg = data?.message || data?.error || "Login failed. Please check your details and try again.";
-        this._setText(errorEl, msg);
+        this._showMessage("error", msg);
         return;
       }
 
       // Set the client-side session indicator cookie
       await this._setUserSessionCookie();
 
-      this._setText(successEl, "Logged in successfully.");
+      this._showMessage("success", "Logged in successfully.");
       window.location.href = "/";
 
     } catch (err) {
-      this._setText(errorEl, err.message || "Login failed due to a network error.");
+      this._showMessage("error", err.message || "Login failed due to a network error.");
       console.error("Login error:", err);
     } finally {
       this._setSubmitState(submitBtn, false);
