@@ -9,6 +9,36 @@ class RegisterForm extends HTMLElement {
         id="register-form-el"
         novalidate
       >
+        <!-- First Name + Last Name -->
+        <div class="form_field-2col">
+          <div class="form_field-wrapper">
+            <div class="form_field-label">First Name</div>
+            <input
+              class="form_input w-input"
+              maxlength="256"
+              name="First-Name"
+              placeholder="First Name"
+              type="text"
+              id="register-first-name"
+              required
+            />
+          </div>
+          <div class="form_field-wrapper">
+            <div class="field-label-wrapper">
+              <div class="form_field-label">Last Name</div>
+            </div>
+            <input
+              class="form_input w-input"
+              maxlength="256"
+              name="Last-Name"
+              placeholder="Last Name"
+              type="text"
+              id="register-last-name"
+              required
+            />
+          </div>
+        </div>
+
         <!-- Email -->
         <div class="form_field-wrapper">
           <div class="form_field-label">Email</div>
@@ -16,40 +46,83 @@ class RegisterForm extends HTMLElement {
             class="form_input w-input"
             maxlength="256"
             name="Register-Email"
-            placeholder=""
+            placeholder="Email"
             type="email"
             id="register-email"
             required
           />
         </div>
 
-        <!-- Password -->
+        <!-- Phone -->
         <div class="form_field-wrapper">
-          <div class="form_field-label">Password</div>
+          <div class="form_field-label">Phone</div>
           <input
             class="form_input w-input"
             maxlength="256"
-            name="Register-Password"
-            placeholder=""
-            type="password"
-            id="register-password"
+            name="Phone"
+            placeholder="Phone Number"
+            type="tel"
+            id="register-phone"
             required
           />
         </div>
 
-        <!-- Confirm Password -->
+        <!-- Residential Address -->
         <div class="form_field-wrapper">
-          <div class="form_field-label">Confirm Password</div>
+          <div class="form_field-label">Residential Address</div>
           <input
             class="form_input w-input"
             maxlength="256"
-            name="Register-Confirm-Password"
-            placeholder=""
-            type="password"
-            id="register-confirm-password"
+            name="Address"
+            placeholder="Address"
+            type="text"
+            id="register-address"
             required
           />
-          <div class="form_field-error" id="password-error">Passwords do not match.</div>
+        </div>
+
+        <!-- Password + Confirm Password -->
+        <div class="form_field-2col">
+          <div class="form_field-wrapper">
+            <div class="form_field-label">Password</div>
+            <input
+              class="form_input w-input"
+              maxlength="256"
+              name="Register-Password"
+              placeholder="Password"
+              type="password"
+              id="register-password"
+              required
+            />
+          </div>
+          <div class="form_field-wrapper">
+            <div class="field-label-wrapper">
+              <div class="form_field-label">Confirm Password</div>
+            </div>
+            <input
+              class="form_input w-input"
+              maxlength="256"
+              name="Register-Confirm-Password"
+              placeholder="Confirm Password"
+              type="password"
+              id="register-confirm-password"
+              required
+            />
+          </div>
+        </div>
+        <div class="form_field-error" id="password-error">Passwords do not match.</div>
+
+        <!-- Referral Code -->
+        <div class="form_field-wrapper">
+          <div class="form_field-label">Referral Code</div>
+          <input
+            class="form_input w-input"
+            maxlength="256"
+            name="Referral-Code"
+            placeholder="Referral Code"
+            type="text"
+            id="register-referral-code"
+          />
         </div>
 
         <!-- Buttons -->
@@ -57,7 +130,7 @@ class RegisterForm extends HTMLElement {
           <input
             type="submit"
             class="button is-full-width w-button"
-            value="Create Account"
+            value="Create account & Continue"
             id="register-submit"
           />
 
@@ -89,11 +162,11 @@ class RegisterForm extends HTMLElement {
   }
 
   _bindEvents() {
-    const form        = this.querySelector('#register-form-el');
-    const password    = this.querySelector('#register-password');
-    const confirm     = this.querySelector('#register-confirm-password');
-    const error       = this.querySelector('#password-error');
-    const backBtn     = this.querySelector('#back-to-login');
+    const form    = this.querySelector('#register-form-el');
+    const password = this.querySelector('#register-password');
+    const confirm  = this.querySelector('#register-confirm-password');
+    const error    = this.querySelector('#password-error');
+    const backBtn  = this.querySelector('#back-to-login');
 
     // Hide error initially
     error.style.display = 'none';
@@ -103,6 +176,7 @@ class RegisterForm extends HTMLElement {
       if (error.style.display === 'block') {
         error.style.display = 'none';
         confirm.classList.remove('is-error');
+        password.classList.remove('is-error');
       }
     });
 
@@ -112,6 +186,7 @@ class RegisterForm extends HTMLElement {
         e.preventDefault();
         error.style.display = 'block';
         confirm.classList.add('is-error');
+        password.classList.add('is-error');
         confirm.focus();
       }
     });
