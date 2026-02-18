@@ -1,4 +1,12 @@
 class LoginForm extends HTMLElement {
+
+  // ── Config ──────────────────────────────────────────────────────────────
+  static LOGIN_ENDPOINT         = "https://api.dev.primedclinic.com.au/api/login";
+  static SANCTUM_CSRF_ENDPOINT  = "https://api.dev.primedclinic.com.au/sanctum/csrf-cookie";
+  static CSRF_TTL_SECONDS       = 7200; // 2 hours
+  static CSRF_EXPIRY_COOKIE     = "wf_csrf_expires_at";
+
+  // ── Lifecycle ────────────────────────────────────────────────────────────
   connectedCallback() {
     this.innerHTML = `
       <form
@@ -76,8 +84,153 @@ class LoginForm extends HTMLElement {
     this._bindEvents();
   }
 
+  // ── Cookie helpers ───────────────────────────────────────────────────────
+  _getCookie(name) {
+    const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+    return match ? decodeURIComponent(match[2]) : null;
+  }
+
+  _setCookie(name, value, maxAgeSeconds, httpOnly = false) {
+    const secure = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie =
+      `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`;
+  }
+
+  // Generates a cryptographically random hex string to use as the __user token
+  _generateUserToken() {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  _setUserSessionCookie() {
+    const token = this._generateUserToken();
+    // Session-length cookie (no Max-Age = expires when browser closes)
+    const secure = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `__user=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`;
+  }
+
+  // ── CSRF ─────────────────────────────────────────────────────────────────
+  _csrfIsValid() {
+    const xsrfToken = this._getCookie("XSRF-TOKEN");
+    const expiresAt = parseInt(this._getCookie(LoginForm.CSRF_EXPIRY_COOKIE) || "", 10);
+    if (!xsrfToken || !Number.isFinite(expiresAt)) return false;
+    return Math.floor(Date.now() / 1000) < expiresAt;
+  }
+
+  async _ensureCsrfCookie() {
+    if (this._csrfIsValid()) return;
+
+    await fetch(LoginForm.SANCTUM_CSRF_ENDPOINT, {
+      method: "GET",
+      credentials: "include"
+    });
+
+    // Record when this token expires so we can skip the round-trip next time
+    const expiresAt = Math.floor(Date.now() / 1000) + LoginForm.CSRF_TTL_SECONDS;
+    this._setCookie(LoginForm.CSRF_EXPIRY_COOKIE, String(expiresAt), LoginForm.CSRF_TTL_SECONDS);
+  }
+
+  // ── UI helpers ───────────────────────────────────────────────────────────
+  _qs(selector) {
+    const el = this.querySelector(selector);
+    if (!el) throw new Error(`Missing element: ${selector}`);
+    return el;
+  }
+
+  _setText(el, text) {
+    if (!el) return;
+    el.textContent = text;
+    el.style.display = "block";
+  }
+
+  _hide(el) {
+    if (!el) return;
+    el.style.display = "none";
+  }
+
+  _setSubmitState(submitBtn, loading) {
+    if (!submitBtn) return;
+    submitBtn.disabled = loading;
+    if (submitBtn.tagName === "INPUT") {
+      submitBtn.value = loading ? "Logging in..." : "Login";
+    } else {
+      submitBtn.textContent = loading ? "Logging in..." : "Login";
+    }
+  }
+
+  // ── Login handler ────────────────────────────────────────────────────────
+  async _handleSubmit(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const form      = e.currentTarget;
+    const errorEl   = form.querySelector('[data-login-error="true"]');
+    const successEl = form.querySelector('[data-login-success="true"]');
+    const submitBtn = form.querySelector('input[type="submit"], button[type="submit"]');
+
+    this._hide(errorEl);
+    this._hide(successEl);
+
+    const email    = (form.querySelector('[data-login-email="true"]')?.value || "").trim();
+    const password = form.querySelector('[data-login-password="true"]')?.value || "";
+
+    if (!email || !password) {
+      this._setText(errorEl, "Please enter your email and password.");
+      return;
+    }
+
+    this._setSubmitState(submitBtn, true);
+
+    try {
+      await this._ensureCsrfCookie();
+
+      const xsrfToken = this._getCookie("XSRF-TOKEN");
+      console.log(`XSRF token: ${xsrfToken ?? "not set"}`);
+
+      const res = await fetch(LoginForm.LOGIN_ENDPOINT, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(xsrfToken ? { "X-XSRF-TOKEN": xsrfToken } : {})
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const msg = data?.message || data?.error || "Login failed. Please check your details and try again.";
+        this._setText(errorEl, msg);
+        return;
+      }
+
+      // Set the client-side session indicator cookie
+      this._setUserSessionCookie();
+
+      this._setText(successEl, "Logged in successfully.");
+      window.location.href = "/";
+
+    } catch (err) {
+      this._setText(errorEl, err.message || "Login failed due to a network error.");
+      console.error("Login error:", err);
+    } finally {
+      this._setSubmitState(submitBtn, false);
+    }
+  }
+
+  // ── Event binding ────────────────────────────────────────────────────────
   _bindEvents() {
+    const form        = this.querySelector('[data-login-form="true"]');
     const registerBtn = this.querySelector('#go-to-register');
+
+    // Avoid double-binding if the component is re-rendered
+    if (form && form.dataset.loginBound !== "true") {
+      form.dataset.loginBound = "true";
+      form.addEventListener("submit", (e) => this._handleSubmit(e));
+    }
 
     registerBtn.addEventListener('click', (e) => {
       e.preventDefault();
