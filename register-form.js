@@ -1,4 +1,12 @@
 class RegisterForm extends HTMLElement {
+
+  // ── Config ──────────────────────────────────────────────────────────────
+  static REGISTER_ENDPOINT     = "https://api.dev.primedclinic.com.au/api/register/guest";
+  static SANCTUM_CSRF_ENDPOINT = "https://api.dev.primedclinic.com.au/sanctum/csrf-cookie";
+  static CSRF_TTL_SECONDS      = 7200;
+  static CSRF_EXPIRY_COOKIE    = "wf_csrf_expires_at";
+
+  // ── Lifecycle ────────────────────────────────────────────────────────────
   connectedCallback() {
     this.innerHTML = `
       <form
@@ -110,7 +118,7 @@ class RegisterForm extends HTMLElement {
             />
           </div>
         </div>
-        <div class="form_field-error" id="password-error">Passwords do not match.</div>
+        <div class="form_field-error" id="password-error" style="display:none">Passwords do not match.</div>
 
         <!-- Referral Code -->
         <div class="form_field-wrapper">
@@ -123,6 +131,13 @@ class RegisterForm extends HTMLElement {
             type="text"
             id="register-referral-code"
           />
+        </div>
+
+        <!-- Error message -->
+        <div class="form_message-error-wrapper w-form-fail" data-register-error-wrapper="true" style="display:none">
+          <div class="form_message-error">
+            <div data-register-error="true"></div>
+          </div>
         </div>
 
         <!-- Buttons -->
@@ -161,37 +176,166 @@ class RegisterForm extends HTMLElement {
     this._bindEvents();
   }
 
+  // ── Cookie helpers ───────────────────────────────────────────────────────
+  _getCookie(name) {
+    const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+    return match ? decodeURIComponent(match[2]) : null;
+  }
+
+  _setCookie(name, value, maxAgeSeconds) {
+    const secure = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${secure}`;
+  }
+
+  // ── CSRF ─────────────────────────────────────────────────────────────────
+  _csrfIsValid() {
+    const xsrfToken = this._getCookie("XSRF-TOKEN");
+    const expiresAt = parseInt(this._getCookie(RegisterForm.CSRF_EXPIRY_COOKIE) || "", 10);
+    if (!xsrfToken || !Number.isFinite(expiresAt)) return false;
+    return Math.floor(Date.now() / 1000) < expiresAt;
+  }
+
+  async _ensureCsrfCookie() {
+    if (this._csrfIsValid()) return;
+
+    await fetch(RegisterForm.SANCTUM_CSRF_ENDPOINT, {
+      method: "GET",
+      credentials: "include"
+    });
+
+    const expiresAt = Math.floor(Date.now() / 1000) + RegisterForm.CSRF_TTL_SECONDS;
+    this._setCookie(RegisterForm.CSRF_EXPIRY_COOKIE, String(expiresAt), RegisterForm.CSRF_TTL_SECONDS);
+  }
+
+  // ── UI helpers ───────────────────────────────────────────────────────────
+  _showError(message) {
+    const wrapper = this.querySelector("[data-register-error-wrapper]");
+    const el      = this.querySelector("[data-register-error]");
+    if (el)      el.textContent = message;
+    if (wrapper) {
+      wrapper.classList.add("w-form-fail");
+      wrapper.style.display = "block";
+    }
+  }
+
+  _hideError() {
+    const wrapper = this.querySelector("[data-register-error-wrapper]");
+    if (wrapper) {
+      wrapper.classList.remove("w-form-fail");
+      wrapper.style.display = "none";
+    }
+  }
+
+  _setSubmitState(submitBtn, loading) {
+    if (!submitBtn) return;
+    submitBtn.disabled = loading;
+    submitBtn.value = loading ? "Please wait..." : "Create account & Continue";
+  }
+
+  _showSuccess() {
+    // Replace the entire component with a success message
+    const wrapper = document.createElement("div");
+    wrapper.className = "form_message-success-wrapper w-form-done";
+    wrapper.innerHTML = `
+      <div class="form_message-success">
+        <div>Almost there! Please check your email and verify your address before logging in.</div>
+      </div>
+    `;
+    this.replaceWith(wrapper);
+  }
+
+  // ── Register handler ─────────────────────────────────────────────────────
+  async _handleSubmit(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const form      = e.currentTarget;
+    const password  = this.querySelector("#register-password");
+    const confirm   = this.querySelector("#register-confirm-password");
+    const pwError   = this.querySelector("#password-error");
+    const submitBtn = form.querySelector('input[type="submit"]');
+
+    // Client-side password match check
+    if (password.value !== confirm.value) {
+      pwError.style.display = "block";
+      confirm.classList.add("is-error");
+      password.classList.add("is-error");
+      confirm.focus();
+      return;
+    }
+
+    this._hideError();
+    this._setSubmitState(submitBtn, true);
+
+    try {
+      await this._ensureCsrfCookie();
+
+      const xsrfToken = this._getCookie("XSRF-TOKEN");
+
+      const payload = {
+        first_name:   (this.querySelector("#register-first-name")?.value   || "").trim(),
+        last_name:    (this.querySelector("#register-last-name")?.value    || "").trim(),
+        email:        (this.querySelector("#register-email")?.value        || "").trim(),
+        phone:        (this.querySelector("#register-phone")?.value        || "").trim(),
+        address:      (this.querySelector("#register-address")?.value      || "").trim(),
+        streetNumber: "",
+        streetName:   "",
+        suburb:       "",
+        state:        "",
+        postcode:     "",
+        password:     password.value,
+        referral_code: (this.querySelector("#register-referral-code")?.value || "").trim()
+      };
+
+      const res = await fetch(RegisterForm.REGISTER_ENDPOINT, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(xsrfToken ? { "X-XSRF-TOKEN": xsrfToken } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const msg = data?.message || data?.error || "Registration failed. Please check your details and try again.";
+        this._showError(msg);
+        return;
+      }
+
+      // Success — swap the form for a verification prompt
+      this._showSuccess();
+
+    } catch (err) {
+      this._showError(err.message || "Registration failed due to a network error.");
+      console.error("Register error:", err);
+    } finally {
+      this._setSubmitState(submitBtn, false);
+    }
+  }
+
+  // ── Event binding ────────────────────────────────────────────────────────
   _bindEvents() {
-    const form    = this.querySelector('#register-form-el');
+    const form     = this.querySelector('#register-form-el');
     const password = this.querySelector('#register-password');
     const confirm  = this.querySelector('#register-confirm-password');
-    const error    = this.querySelector('#password-error');
+    const pwError  = this.querySelector('#password-error');
     const backBtn  = this.querySelector('#back-to-login');
 
-    // Hide error initially
-    error.style.display = 'none';
-
-    // Clear error as user re-types
+    // Clear password mismatch error as user re-types
     confirm.addEventListener('input', () => {
-      if (error.style.display === 'block') {
-        error.style.display = 'none';
+      if (pwError.style.display === 'block') {
+        pwError.style.display = 'none';
         confirm.classList.remove('is-error');
         password.classList.remove('is-error');
       }
     });
 
-    // Validate on submit
-    form.addEventListener('submit', (e) => {
-      if (password.value !== confirm.value) {
-        e.preventDefault();
-        error.style.display = 'block';
-        confirm.classList.add('is-error');
-        password.classList.add('is-error');
-        confirm.focus();
-      }
-    });
+    form.addEventListener('submit', (e) => this._handleSubmit(e));
 
-    // Swap back to login
     backBtn.addEventListener('click', (e) => {
       e.preventDefault();
       const loginForm = document.createElement('login-form');
