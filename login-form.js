@@ -1,12 +1,13 @@
 class LoginForm extends HTMLElement {
 
   // ── Config ──────────────────────────────────────────────────────────────
-  static LOGIN_ENDPOINT         = "https://api.dev.primedclinic.com.au/api/login";
-  static SEND_CODE_ENDPOINT     = "https://api.dev.primedclinic.com.au/api/send-code";
-  static VALIDATE_CODE_ENDPOINT = "https://api.dev.primedclinic.com.au/api/validate-code";
-  static SANCTUM_CSRF_ENDPOINT  = "https://api.dev.primedclinic.com.au/sanctum/csrf-cookie";
-  static CSRF_TTL_SECONDS       = 7200; // 2 hours
-  static CSRF_EXPIRY_COOKIE     = "wf_csrf_expires_at";
+  static LOGIN_ENDPOINT           = "https://api.dev.primedclinic.com.au/api/login";
+  static SEND_CODE_ENDPOINT       = "https://api.dev.primedclinic.com.au/api/send-code";
+  static VALIDATE_CODE_ENDPOINT   = "https://api.dev.primedclinic.com.au/api/validate-code";
+  static FORGOT_PASSWORD_ENDPOINT = "https://api.dev.primedclinic.com.au/api/forgot-password";
+  static SANCTUM_CSRF_ENDPOINT    = "https://api.dev.primedclinic.com.au/sanctum/csrf-cookie";
+  static CSRF_TTL_SECONDS         = 7200; // 2 hours
+  static CSRF_EXPIRY_COOKIE       = "wf_csrf_expires_at";
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
   connectedCallback() {
@@ -19,8 +20,8 @@ class LoginForm extends HTMLElement {
         data-login-form="true"
       >
 
-        <!-- Login method toggle -->
-        <div class="form_toggle-wrapper">
+        <!-- Login method toggle (hidden on reset panel) -->
+        <div class="form_toggle-wrapper" data-login-toggle-wrapper="true">
           <button type="button" class="form_toggle-btn is-active" data-toggle="password">
             Login with Password
           </button>
@@ -49,7 +50,7 @@ class LoginForm extends HTMLElement {
           <div class="form_field-wrapper">
             <div class="field-label-wrapper">
               <div class="form_field-label">Password</div>
-              <a href="#" class="text-style-link">Reset your password</a>
+              <a href="#" class="text-style-link" data-reset-password-link="true">Reset your password</a>
             </div>
             <input
               class="form_input w-input"
@@ -105,6 +106,27 @@ class LoginForm extends HTMLElement {
 
         </div>
 
+        <!-- ── Reset password fields ── -->
+        <div data-login-panel="reset" style="display:none">
+
+          <div class="form_field-wrapper">
+            <div class="field-label-wrapper">
+              <div class="form_field-label">Email</div>
+              <a href="#" class="text-style-link" data-back-to-login="true">Back to Login</a>
+            </div>
+            <input
+              class="form_input w-input"
+              maxlength="256"
+              name="Reset-Email"
+              placeholder=""
+              type="email"
+              data-reset-email="true"
+            />
+            <div class="form_field-error" data-reset-email-error="true" style="display:none"></div>
+          </div>
+
+        </div>
+
         <!-- Buttons -->
         <div class="w-layout-grid form-button-wrapper">
           <input
@@ -114,7 +136,7 @@ class LoginForm extends HTMLElement {
             value="Login"
           />
 
-          <div class="button-group is-center">
+          <div class="button-group is-center" data-login-register-btn-wrapper="true">
             <a href="#" class="button-glide-over w-inline-block" id="go-to-register">
               <span class="button-glide-over__container">
                 <span class="button-glide-over__icon is-first">
@@ -155,8 +177,8 @@ class LoginForm extends HTMLElement {
 
     this._activePanel    = "password";
     this._codeStep       = "identifier"; // "identifier" | "otp"
-    this._codeIdentifier = null;         // stores the validated email or phone between steps
-    this._codeType       = null;         // "email" | "phone"
+    this._codeIdentifier = null;
+    this._codeType       = null;
     this._bindEvents();
   }
 
@@ -173,20 +195,32 @@ class LoginForm extends HTMLElement {
   _switchPanel(panel) {
     this._activePanel = panel;
 
-    const passwordPanel = this.querySelector('[data-login-panel="password"]');
-    const codePanel     = this.querySelector('[data-login-panel="code"]');
-    const submitBtn     = this.querySelector('[data-login-submit="true"]');
-    const toggleBtns    = this.querySelectorAll('.form_toggle-btn');
+    const allPanels     = this.querySelectorAll('[data-login-panel]');
+    const toggleWrapper = this.querySelector('[data-login-toggle-wrapper]');
+    const registerBtnWrapper = this.querySelector('[data-login-register-btn-wrapper]');
 
-    passwordPanel.style.display = panel === "password" ? "" : "none";
-    codePanel.style.display     = panel === "code"     ? "" : "none";
+    // Show only the target panel
+    allPanels.forEach(el => {
+      el.style.display = el.dataset.loginPanel === panel ? "" : "none";
+    });
 
-    // Reset code flow back to step 1 when switching away and back
+    // Hide toggle and register button on the reset panel
+    const isReset = panel === "reset";
+    if (toggleWrapper)      toggleWrapper.style.display      = isReset ? "none" : "";
+    if (registerBtnWrapper) registerBtnWrapper.style.display = isReset ? "none" : "";
+
+    // Reset code flow when switching back to code panel
     if (panel === "code") {
       this._switchCodeStep("identifier");
     }
 
-    toggleBtns.forEach(btn => {
+    // Focus the reset email input when switching to reset panel
+    if (panel === "reset") {
+      this.querySelector('[data-reset-email="true"]')?.focus();
+    }
+
+    // Update toggle button active states (only relevant for password/code)
+    this.querySelectorAll('.form_toggle-btn').forEach(btn => {
       btn.classList.toggle('is-active', btn.dataset.toggle === panel);
     });
 
@@ -215,13 +249,15 @@ class LoginForm extends HTMLElement {
     if (!submitBtn) return;
 
     if (loading) {
-      submitBtn.value = this._activePanel === "password"
-        ? "Logging in..."
-        : this._codeStep === "identifier" ? "Sending..." : "Verifying...";
+      submitBtn.value = this._activePanel === "password" ? "Logging in..."
+        : this._activePanel === "reset"    ? "Sending..."
+        : this._codeStep === "identifier"  ? "Sending..."
+        : "Verifying...";
     } else {
-      submitBtn.value = this._activePanel === "password"
-        ? "Login"
-        : this._codeStep === "identifier" ? "Send Code" : "Verify Code";
+      submitBtn.value = this._activePanel === "password" ? "Login"
+        : this._activePanel === "reset"    ? "Send Reset Link"
+        : this._codeStep === "identifier"  ? "Send Code"
+        : "Verify Code";
     }
   }
 
@@ -393,7 +429,6 @@ class LoginForm extends HTMLElement {
     const identifierError = form.querySelector('[data-login-identifier-error="true"]');
     const raw             = (identifierInput?.value || "").trim();
 
-    // Reset inline error
     identifierError.style.display = "none";
     identifierError.textContent   = "";
     identifierInput.classList.remove("is-error");
@@ -434,11 +469,8 @@ class LoginForm extends HTMLElement {
         return;
       }
 
-      // Store identifier for use in the validate step
       this._codeIdentifier = raw;
       this._codeType       = type;
-
-      // Advance to OTP step
       this._hideMessages();
       this._switchCodeStep("otp");
 
@@ -455,7 +487,6 @@ class LoginForm extends HTMLElement {
     const otpError = form.querySelector('[data-login-otp-error="true"]');
     const code     = (otpInput?.value || "").trim();
 
-    // Reset inline error
     otpError.style.display = "none";
     otpError.textContent   = "";
     otpInput.classList.remove("is-error");
@@ -497,7 +528,6 @@ class LoginForm extends HTMLElement {
         return;
       }
 
-      // Successful OTP login — same session setup as password login
       await this._setUserSessionCookie();
       this._showMessage("success", "Logged in successfully.");
       window.location.href = "/";
@@ -505,6 +535,55 @@ class LoginForm extends HTMLElement {
     } catch (err) {
       this._showMessage("error", err.message || "Verification failed due to a network error.");
       console.error("Validate code error:", err);
+    } finally {
+      this._setSubmitState(submitBtn, false);
+    }
+  }
+
+  async _handleForgotPassword(form, submitBtn) {
+    const emailInput = form.querySelector('[data-reset-email="true"]');
+    const emailError = form.querySelector('[data-reset-email-error="true"]');
+    const email      = (emailInput?.value || "").trim();
+
+    // Reset inline error
+    emailError.style.display = "none";
+    emailError.textContent   = "";
+    emailInput.classList.remove("is-error");
+
+    if (!email) {
+      emailError.textContent   = "Please enter your email address.";
+      emailError.style.display = "block";
+      emailInput.classList.add("is-error");
+      emailInput.focus();
+      return;
+    }
+
+    this._setSubmitState(submitBtn, true);
+
+    try {
+      await this._ensureCsrfCookie();
+      const xsrfToken = this._getCookie("XSRF-TOKEN");
+
+      const res = await fetch(LoginForm.FORGOT_PASSWORD_ENDPOINT, {
+        method: "POST",
+        credentials: "include",
+        headers: this._buildHeaders(xsrfToken),
+        body: JSON.stringify({ email })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const msg = data?.message || data?.error || "Failed to send reset link. Please try again.";
+        this._showMessage("error", msg);
+        return;
+      }
+
+      this._showMessage("success", "If an account exists for that email, a password reset link has been sent.");
+
+    } catch (err) {
+      this._showMessage("error", err.message || "Failed to send reset link due to a network error.");
+      console.error("Forgot password error:", err);
     } finally {
       this._setSubmitState(submitBtn, false);
     }
@@ -521,6 +600,8 @@ class LoginForm extends HTMLElement {
 
     if (this._activePanel === "password") {
       await this._handlePasswordSubmit(form, submitBtn);
+    } else if (this._activePanel === "reset") {
+      await this._handleForgotPassword(form, submitBtn);
     } else if (this._codeStep === "identifier") {
       await this._handleSendCode(form, submitBtn);
     } else {
@@ -530,20 +611,30 @@ class LoginForm extends HTMLElement {
 
   // ── Event binding ────────────────────────────────────────────────────────
   _bindEvents() {
-    const form        = this.querySelector('[data-login-form="true"]');
-    const registerBtn = this.querySelector('#go-to-register');
-    const toggleBtns  = this.querySelectorAll('.form_toggle-btn');
-    const resendBtn   = this.querySelector('[data-resend-code="true"]');
+    const form           = this.querySelector('[data-login-form="true"]');
+    const registerBtn    = this.querySelector('#go-to-register');
+    const toggleBtns     = this.querySelectorAll('.form_toggle-btn');
+    const resendBtn      = this.querySelector('[data-resend-code="true"]');
+    const resetLink      = this.querySelector('[data-reset-password-link="true"]');
+    const backToLoginBtn = this.querySelector('[data-back-to-login="true"]');
 
     toggleBtns.forEach(btn => {
       btn.addEventListener('click', () => this._switchPanel(btn.dataset.toggle));
     });
 
+    resetLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      this._switchPanel("reset");
+    });
+
+    backToLoginBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      this._switchPanel("password");
+    });
+
     resendBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       if (this._codeStep !== "otp" || !this._codeIdentifier) return;
-
-      // Re-use _handleSendCode by temporarily faking the form state
       const submitBtn = form.querySelector('[data-login-submit="true"]');
       this._switchCodeStep("identifier");
       form.querySelector('[data-login-identifier="true"]').value = this._codeIdentifier;
