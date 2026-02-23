@@ -29,8 +29,6 @@ Add the following to your HTML page:
 ```html
 <!-- In <head> -->
 <link rel="stylesheet" href="/path/to/style.css">
-
-<!-- Before </body> -->
 <script src="/path/to/login-form.js" defer></script>
 <script src="/path/to/register-form.js" defer></script>
 <script src="/path/to/logout.js" defer></script>
