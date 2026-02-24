@@ -43,7 +43,7 @@ class LoginForm extends HTMLElement {
             <input
               class="form_input w-input"
               maxlength="256"
-              name="Log-In-Form-7-Email"
+              name="Email"
               placeholder=""
               type="email"
               data-login-email="true"
@@ -59,7 +59,7 @@ class LoginForm extends HTMLElement {
             <input
               class="form_input w-input"
               maxlength="256"
-              name="Log-In-Form-7-Password"
+              name="Password"
               placeholder=""
               type="password"
               data-login-password="true"
