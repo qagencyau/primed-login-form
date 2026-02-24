@@ -334,6 +334,12 @@ class RegisterForm extends HTMLElement {
 
     backBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      // Strip the register param/hash from the URL so the login form
+      // doesn't immediately detect it and swap back to register.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("view");
+      if (url.hash === "#register") url.hash = "";
+      history.replaceState(null, "", url.toString());
       const loginForm = document.createElement('login-form');
       this.replaceWith(loginForm);
     });
