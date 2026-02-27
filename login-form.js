@@ -15,33 +15,33 @@ class LoginForm extends HTMLElement {
 
   static LOGIN_ENDPOINT_MAP = {
     "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/api/login",
-    "primedclinic.com.au": "https://app.primedclinic.com.au/api/login",
+    "www.primedclinic.com.au": "https://app.primedclinic.com.au/api/login",
   };
 
   static SEND_CODE_ENDPOINT_MAP = {
     "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/api/send-code",
-    "primedclinic.com.au": "https://app.primedclinic.com.au/api/send-code",
+    "www.primedclinic.com.au": "https://app.primedclinic.com.au/api/send-code",
   };
 
   static VALIDATE_CODE_ENDPOINT_MAP = {
     "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/api/validate-code",
-    "primedclinic.com.au": "https://app.primedclinic.com.au/api/validate-code",
+    "www.primedclinic.com.au": "https://app.primedclinic.com.au/api/validate-code",
   };
 
   static FORGOT_PASSWORD_ENDPOINT_MAP = {
     "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/api/forgot-password",
-    "primedclinic.com.au": "https://app.primedclinic.com.au/api/forgot-password",
+    "www.primedclinic.com.au": "https://app.primedclinic.com.au/api/forgot-password",
   };
 
   static SANCTUM_CSRF_ENDPOINT_MAP = {
     "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/sanctum/csrf-cookie",
-    "primedclinic.com.au": "https://app.primedclinic.com.au/sanctum/csrf-cookie",
+    "www.primedclinic.com.au": "https://app.primedclinic.com.au/sanctum/csrf-cookie",
   };
   // Domain → post-login redirect map.
   // The first hostname that ends with the key is used.
   static LOGIN_REDIRECT_MAP = {
     "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/patient",
-    "primedclinic.com.au": "https://app.primedclinic.com.au/patient",
+    "www.primedclinic.com.au": "https://app.primedclinic.com.au/patient",
   };
 
   // ── Redirect helper ─────────────────────────────────────────────────────
