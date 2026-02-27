@@ -1,11 +1,11 @@
 class LoginForm extends HTMLElement {
 
   // ── Config ──────────────────────────────────────────────────────────────
-  static LOGIN_ENDPOINT           = "https://api.dev.primedclinic.com.au/api/login";
-  static SEND_CODE_ENDPOINT       = "https://api.dev.primedclinic.com.au/api/send-code";
-  static VALIDATE_CODE_ENDPOINT   = "https://api.dev.primedclinic.com.au/api/validate-code";
-  static FORGOT_PASSWORD_ENDPOINT = "https://api.dev.primedclinic.com.au/api/forgot-password";
-  static SANCTUM_CSRF_ENDPOINT    = "https://api.dev.primedclinic.com.au/sanctum/csrf-cookie";
+  // static LOGIN_ENDPOINT           = "https://api.dev.primedclinic.com.au/api/login";
+  // static SEND_CODE_ENDPOINT       = "https://api.dev.primedclinic.com.au/api/send-code";
+  // static VALIDATE_CODE_ENDPOINT   = "https://api.dev.primedclinic.com.au/api/validate-code";
+  // static FORGOT_PASSWORD_ENDPOINT = "https://api.dev.primedclinic.com.au/api/forgot-password";
+  // static SANCTUM_CSRF_ENDPOINT    = "https://api.dev.primedclinic.com.au/sanctum/csrf-cookie";
   static CSRF_TTL_SECONDS         = 7200; // 2 hours
   static CSRF_EXPIRY_COOKIE       = "wf_csrf_expires_at";
   // URL param that triggers the register form on load.
@@ -13,11 +13,35 @@ class LoginForm extends HTMLElement {
   static REGISTER_PARAM_NAME      = "view";
   static REGISTER_PARAM_VALUE     = "register";
 
+  static LOGIN_ENDPOINT_MAP = {
+    "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/api/login",
+    "primedclinic.com.au": "https://app.primedclinic.com.au/api/login",
+  };
+
+  static SEND_CODE_ENDPOINT_MAP = {
+    "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/api/send-code",
+    "primedclinic.com.au": "https://app.primedclinic.com.au/api/send-code",
+  };
+
+  static VALIDATE_CODE_ENDPOINT_MAP = {
+    "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/api/validate-code",
+    "primedclinic.com.au": "https://app.primedclinic.com.au/api/validate-code",
+  };
+
+  static FORGOT_PASSWORD_ENDPOINT_MAP = {
+    "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/api/forgot-password",
+    "primedclinic.com.au": "https://app.primedclinic.com.au/api/forgot-password",
+  };
+
+  static SANCTUM_CSRF_ENDPOINT_MAP = {
+    "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/sanctum/csrf-cookie",
+    "primedclinic.com.au": "https://app.primedclinic.com.au/sanctum/csrf-cookie",
+  };
   // Domain → post-login redirect map.
   // The first hostname that ends with the key is used.
   static LOGIN_REDIRECT_MAP = {
     "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/patient",
-    "primedclinic.com.au":              "https://app.primedclinic.com.au/patient",
+    "primedclinic.com.au": "https://app.primedclinic.com.au/patient",
   };
 
   // ── Redirect helper ─────────────────────────────────────────────────────
@@ -27,6 +51,34 @@ class LoginForm extends HTMLElement {
       if (hostname === key || hostname.endsWith("." + key)) return url;
     }
     return "/"; // fallback
+  }
+  // LOGIN route
+  static _resolveEndpoint(map) {
+    const host = window.location.hostname;
+
+    if (!map[host]) {
+      throw new Error(`No endpoint configured for host: ${host}`);
+    }
+
+    return map[host];
+  }
+  static get LOGIN_ENDPOINT() {
+    return this._resolveEndpoint(this.LOGIN_ENDPOINT_MAP);
+  }
+  static get SEND_CODE_ENDPOINT() {
+    return this._resolveEndpoint(this.SEND_CODE_ENDPOINT_MAP);
+  }
+
+  static get VALIDATE_CODE_ENDPOINT() {
+    return this._resolveEndpoint(this.VALIDATE_CODE_ENDPOINT_MAP);
+  }
+
+  static get FORGOT_PASSWORD_ENDPOINT() {
+    return this._resolveEndpoint(this.FORGOT_PASSWORD_ENDPOINT_MAP);
+  }
+
+  static get SANCTUM_CSRF_ENDPOINT() {
+    return this._resolveEndpoint(this.SANCTUM_CSRF_ENDPOINT_MAP);
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
