@@ -53,15 +53,18 @@ class LoginForm extends HTMLElement {
     return "/"; // fallback
   }
   // LOGIN route
-  static _resolveEndpoint(map) {
-    const host = window.location.hostname;
 
-    if (!map[host]) {
-      throw new Error(`No endpoint configured for host: ${host}`);
+static _resolveEndpoint(map) {
+    const hostname = window.location.hostname;
+    for (const [key, url] of Object.entries(map)) {
+      // exact match or subdomain match
+      if (hostname === key || hostname.endsWith("." + key)) {
+        return url;
+      }
     }
-
-    return map[host];
+    throw new Error(`No endpoint configured for host: ${hostname}`);
   }
+  
   static get LOGIN_ENDPOINT() {
     return this._resolveEndpoint(this.LOGIN_ENDPOINT_MAP);
   }
