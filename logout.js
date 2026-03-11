@@ -1,8 +1,22 @@
 (() => {
 
   // ── Config ──────────────────────────────────────────────────────────────
-  const LOGOUT_ENDPOINT = "https://api.dev.primedclinic.com.au/api/logout";
+  const LOGOUT_ENDPOINT_MAP = {
+      "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/api/logout",
+      "www.primedclinic.com.au":              "https://app.primedclinic.com.au/api/logout",
+    };
+// ── Endpoint resolver ────────────────────────────────────────────────────
+  function resolveEndpoint(map) {
+    const hostname = window.location.hostname;
 
+    for (const [key, url] of Object.entries(map)) {
+      if (hostname === key || hostname.endsWith("." + key)) {
+        return url;
+      }
+    }
+
+    throw new Error(`No logout endpoint configured for host: ${hostname}`);
+  }
   // ── Cookie helpers ───────────────────────────────────────────────────────
   function getCookie(name) {
     const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
@@ -19,6 +33,7 @@
     e.preventDefault();
 
     const xsrfToken = getCookie("XSRF-TOKEN");
+    const LOGOUT_ENDPOINT = resolveEndpoint(LOGOUT_ENDPOINT_MAP);
 
     if (!xsrfToken) {
       console.warn("No XSRF token found — session may already be expired.");

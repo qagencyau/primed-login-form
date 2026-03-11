@@ -2,7 +2,7 @@
 // Mirrors the domain map in login-form.js — add entries here as new environments are added.
 const AUTH_STATUS_MAP = {
   "dev-frontend.primedclinic.com.au": "https://api.dev.primedclinic.com.au/auth-status",
-  "primedclinic.com.au":              "https://api.primedclinic.com.au/auth-status",
+  "www.primedclinic.com.au":              "https://app.primedclinic.com.au/auth-status",
 };
 
 function getAuthStatusEndpoint() {
@@ -102,7 +102,8 @@ async function checkServerAuthStatus() {
 
   const headers = new Headers({
     "Accept":       "application/json",
-    "Content-Type": "application/json",
+    // removing content type to avoid cors
+    // "Content-Type": "application/json",
     ...(xsrfToken ? { "X-XSRF-TOKEN": xsrfToken } : {})
   });
 
