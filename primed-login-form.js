@@ -10,11 +10,19 @@
   class LoginFormController {
     constructor(container) {
       this.container = container;
+
+      // Password tab form
       this.form = container.querySelector("form.login_input-form");
       this.emailInput = container.querySelector("#login-form_email");
       this.passInput = container.querySelector("#login-form_password");
       this.submitBtn = container.querySelector("input[type='submit']");
       this.resetLink = container.querySelector(".field-label-wrapper .text-style-link");
+
+      // Code tab: two separate step wrappers and forms
+      this.identifierStep = container.querySelector('[data-code-step="identifier"]');
+      this.otpStep = container.querySelector('[data-code-step="otp"]');
+      this.identifierForm = this.identifierStep ? this.identifierStep.querySelector("form.login_input-form") : null;
+      this.otpForm = this.otpStep ? this.otpStep.querySelector("form.login_input-form") : null;
 
       const state = Shared.loginUiState.get();
       this.codeStep = state.codeStep || "identifier";
@@ -30,6 +38,10 @@
       }
 
       this.passInput.type = "password";
+
+      // OTP step starts hidden; identifier step shown by default
+      if (this.otpStep) this.otpStep.style.display = "none";
+
       this.cacheMessages();
       this.bindEvents();
       this.restore();
@@ -97,7 +109,6 @@
         this.switchCodeStep(this.codeStep, true);
       }
 
-      this.setSubmitState(false);
     }
 
     showLogin() {
@@ -146,38 +157,25 @@
       }
     }
 
-    setSubmitState(loading) {
-      this.submitBtn.disabled = loading;
-
-      if (loading) {
-        this.submitBtn.value =
-          this.activePanel === "password" ? "Logging in..." :
-          this.activePanel === "reset"    ? "Sending..." :
-          this.codeStep === "identifier"  ? "Sending..." : "Verifying...";
-      } else {
-        this.submitBtn.value =
-          this.activePanel === "password" ? "Login" :
-          this.activePanel === "reset"    ? "Send Reset Link" :
-          this.codeStep === "identifier"  ? "Send Code" : "Verify Code";
-      }
+    setSubmitState(loading, form) {
+      const target = form || this.form;
+      const btn = target ? target.querySelector("input[type='submit']") : null;
+      if (!btn) return;
+      btn.disabled = loading;
     }
 
     // Shows/hides the identifier vs OTP step within the code tab pane.
     switchCodeStep(step, skipSave) {
       this.codeStep = step;
 
-      const identifierStep = this.form.querySelector('[data-code-step="identifier"]');
-      const otpStep = this.form.querySelector('[data-code-step="otp"]');
-
-      if (identifierStep) identifierStep.style.display = step === "identifier" ? "" : "none";
-      if (otpStep) otpStep.style.display = step === "otp" ? "" : "none";
+      if (this.identifierStep) this.identifierStep.style.display = step === "identifier" ? "" : "none";
+      if (this.otpStep) this.otpStep.style.display = step === "otp" ? "" : "none";
 
       if (step === "otp") {
-        const otpInput = this.form.querySelector("[data-login-otp]");
+        const otpInput = this.otpStep ? this.otpStep.querySelector("[data-login-otp]") : null;
         if (otpInput) otpInput.focus();
       }
 
-      this.setSubmitState(false);
       if (!skipSave) this.syncUiState();
     }
 
@@ -190,7 +188,7 @@
         return;
       }
 
-      this.setSubmitState(true);
+      this.setSubmitState(true, this.form);
 
       try {
         await Shared.ensureCsrfCookie();
@@ -227,13 +225,14 @@
         this.showMessage("error", (err && err.message) || "Login failed due to a network error.");
         console.error("[LoginForm] Login error:", err);
       } finally {
-        this.setSubmitState(false);
+        this.setSubmitState(false, this.form);
       }
     }
 
     async handleSendCode() {
-      const identifierInput = this.form.querySelector("[data-login-identifier]");
-      const identifierError = this.form.querySelector("[data-login-identifier-error]");
+      const scope = this.identifierStep || this.container;
+      const identifierInput = scope.querySelector("[data-login-identifier]");
+      const identifierError = scope.querySelector("[data-login-identifier-error]");
       const raw = (identifierInput ? identifierInput.value : "").trim();
 
       if (identifierError) {
@@ -255,7 +254,7 @@
         return;
       }
 
-      this.setSubmitState(true);
+      this.setSubmitState(true, this.identifierForm);
 
       try {
         await Shared.ensureCsrfCookie();
@@ -292,13 +291,14 @@
         this.showMessage("error", (err && err.message) || "Failed to send code due to a network error.");
         console.error("[LoginForm] Send code error:", err);
       } finally {
-        this.setSubmitState(false);
+        this.setSubmitState(false, this.identifierForm);
       }
     }
 
     async handleValidateCode() {
-      const otpInput = this.form.querySelector("[data-login-otp]");
-      const otpError = this.form.querySelector("[data-login-otp-error]");
+      const scope = this.otpStep || this.container;
+      const otpInput = scope.querySelector("[data-login-otp]");
+      const otpError = scope.querySelector("[data-login-otp-error]");
       const code = (otpInput ? otpInput.value : "").trim();
 
       if (otpError) {
@@ -319,7 +319,7 @@
         return;
       }
 
-      this.setSubmitState(true);
+      this.setSubmitState(true, this.otpForm);
 
       try {
         await Shared.ensureCsrfCookie();
@@ -362,7 +362,7 @@
         this.showMessage("error", (err && err.message) || "Verification failed due to a network error.");
         console.error("[LoginForm] Validate code error:", err);
       } finally {
-        this.setSubmitState(false);
+        this.setSubmitState(false, this.otpForm);
       }
     }
 
@@ -389,7 +389,7 @@
         return;
       }
 
-      this.setSubmitState(true);
+      this.setSubmitState(true, this.form);
 
       try {
         await Shared.ensureCsrfCookie();
@@ -419,46 +419,50 @@
         this.showMessage("error", (err && err.message) || "Failed to send reset link due to a network error.");
         console.error("[LoginForm] Forgot password error:", err);
       } finally {
-        this.setSubmitState(false);
+        this.setSubmitState(false, this.form);
       }
     }
 
     bindEvents() {
-      this.form.setAttribute("novalidate", "novalidate");
-
-      this.form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-
-        this.activePanel = this.readActivePanel();
-        this.hideMessages();
-
-        try {
-          if (this.activePanel === "password") {
-            await this.handlePasswordSubmit();
-          } else if (this.activePanel === "reset") {
-            await this.handleForgotPassword();
-          } else if (this.codeStep === "identifier") {
-            await this.handleSendCode();
-          } else {
-            await this.handleValidateCode();
+      const bindSubmit = (form, handler) => {
+        if (!form) return;
+        form.setAttribute("novalidate", "novalidate");
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          this.hideMessages();
+          try {
+            await handler();
+          } catch (err) {
+            console.error("[LoginForm] Submit error:", err);
+            this.showMessage("error", "Something went wrong. Please try again.");
           }
-        } catch (err) {
-          console.error("[LoginForm] Submit error:", err);
-          this.showMessage("error", "Something went wrong. Please try again.");
-          this.setSubmitState(false);
-        }
+          return false;
+        }, true);
+      };
 
-        return false;
-      }, true);
+      // Password tab form
+      bindSubmit(this.form, () => {
+        this.activePanel = this.readActivePanel();
+        if (this.activePanel === "reset") return this.handleForgotPassword();
+        return this.handlePasswordSubmit();
+      });
+
+      // Code tab: identifier step form → send code
+      bindSubmit(this.identifierForm, () => this.handleSendCode());
+
+      // Code tab: OTP step form → validate code
+      bindSubmit(this.otpForm, () => this.handleValidateCode());
 
       // Track active panel when Webflow tab links (with data-toggle) are clicked.
       this.container.querySelectorAll("[data-toggle]").forEach((btn) => {
         btn.addEventListener("click", () => {
           this.activePanel = btn.dataset.toggle;
-          if (this.activePanel === "password") this.codeStep = "identifier";
-          this.setSubmitState(false);
+          if (this.activePanel === "password") {
+            this.codeStep = "identifier";
+            this.switchCodeStep("identifier", true);
+          }
           this.hideMessages();
         });
       });
@@ -467,29 +471,27 @@
         this.resetLink.addEventListener("click", (e) => {
           e.preventDefault();
           this.activePanel = "reset";
-          this.setSubmitState(false);
         });
       }
 
-      this.form.addEventListener("click", async (e) => {
+      // Resend code — lives in the OTP step
+      const resendBtn = this.otpStep ? this.otpStep.querySelector("[data-resend-code]") : null;
+      if (resendBtn) {
+        resendBtn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          if (!this.codeIdentifier) return;
+          this.switchCodeStep("identifier");
+          const identifierInput = this.identifierStep ? this.identifierStep.querySelector("[data-login-identifier]") : null;
+          if (identifierInput) identifierInput.value = this.codeIdentifier;
+          await this.handleSendCode();
+        });
+      }
+
+      this.container.addEventListener("click", (e) => {
         if (e.target.closest("[data-back-to-login]")) {
           e.preventDefault();
           this.codeStep = "identifier";
           this.activePanel = "password";
-          this.setSubmitState(false);
-          return;
-        }
-
-        if (e.target.closest("[data-resend-code]")) {
-          e.preventDefault();
-
-          if (this.codeStep !== "otp" || !this.codeIdentifier) return;
-
-          this.switchCodeStep("identifier");
-          const identifierInput = this.form.querySelector("[data-login-identifier]");
-          if (identifierInput) identifierInput.value = this.codeIdentifier;
-
-          await this.handleSendCode();
         }
       });
 
