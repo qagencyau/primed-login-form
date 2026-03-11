@@ -209,11 +209,9 @@
         });
       });
 
-      const toggleWrapper = this.container.querySelector("[data-login-toggle-wrapper]");
       const registerBtnWrapper = this.container.querySelector("[data-login-register-btn-wrapper]");
       const isReset = panel === "reset";
 
-      if (toggleWrapper) toggleWrapper.style.display = isReset ? "none" : "";
       if (registerBtnWrapper) registerBtnWrapper.style.display = isReset ? "none" : "";
 
       if (panel === "code") {
@@ -591,16 +589,6 @@
       emailWrapper.parentNode.insertBefore(passwordPanel, emailWrapper);
       passwordPanel.appendChild(emailWrapper);
       passwordPanel.appendChild(passWrapper);
-
-      const toggleWrapper = document.createElement("div");
-      toggleWrapper.setAttribute("data-login-toggle-wrapper", "");
-      toggleWrapper.innerHTML = `
-        <div class="form_toggle-wrapper" style="display:flex; gap:0.5rem; margin-bottom:1rem;">
-          <button type="button" class="form_toggle-btn is-active" data-toggle="password">Password</button>
-          <button type="button" class="form_toggle-btn" data-toggle="code">Code</button>
-        </div>
-      `;
-      passwordPanel.parentNode.insertBefore(toggleWrapper, passwordPanel);
 
       const codePanel = document.createElement("div");
       codePanel.setAttribute("data-login-panel", "code");
