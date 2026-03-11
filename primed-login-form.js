@@ -12,11 +12,14 @@
       this.container = container;
 
       // Password tab form
+      this.resetPanel = container.querySelector('[data-login-panel="reset"]');
+      this.passwordFormBlock = this.resetPanel ? this.resetPanel.previousElementSibling : null;
       this.form = container.querySelector("form.login_input-form");
       this.emailInput = container.querySelector("#login-form_email");
       this.passInput = container.querySelector("#login-form_password");
       this.submitBtn = container.querySelector("input[type='submit']");
       this.resetLink = container.querySelector(".field-label-wrapper .text-style-link");
+      this.resetForm = this.resetPanel ? this.resetPanel.querySelector("form.login_input-form") : null;
 
       // Code tab: two separate step wrappers and forms
       this.identifierStep = container.querySelector('[data-code-step="identifier"]');
@@ -41,6 +44,9 @@
 
       // OTP step starts hidden; identifier step shown by default
       if (this.otpStep) this.otpStep.style.display = "none";
+
+      // Reset panel starts hidden
+      if (this.resetPanel) this.resetPanel.style.display = "none";
 
       this.cacheMessages();
       this.bindEvents();
@@ -109,6 +115,18 @@
         this.switchCodeStep(this.codeStep, true);
       }
 
+    }
+
+    showResetPanel() {
+      if (this.passwordFormBlock) this.passwordFormBlock.style.display = "none";
+      if (this.resetPanel) this.resetPanel.style.display = "";
+      this.activePanel = "reset";
+    }
+
+    showPasswordPanel() {
+      if (this.resetPanel) this.resetPanel.style.display = "none";
+      if (this.passwordFormBlock) this.passwordFormBlock.style.display = "";
+      this.activePanel = "password";
     }
 
     showLogin() {
@@ -371,8 +389,9 @@
     }
 
     async handleForgotPassword() {
-      const emailEl = this.form.querySelector("[data-reset-email]");
-      const emailErr = this.form.querySelector("[data-reset-email-error]");
+      const scope = this.resetForm || this.resetPanel || this.form;
+      const emailEl = scope.querySelector("[data-reset-email]");
+      const emailErr = scope.querySelector("[data-reset-email-error]");
       const email = (emailEl ? emailEl.value : "").trim();
 
       if (emailErr) {
@@ -393,7 +412,7 @@
         return;
       }
 
-      this.setSubmitState(true, this.form);
+      this.setSubmitState(true, this.resetForm || this.form);
 
       try {
         await Shared.ensureCsrfCookie();
@@ -423,7 +442,7 @@
         this.showMessage("error", (err && err.message) || "Failed to send reset link due to a network error.");
         console.error("[LoginForm] Forgot password error:", err);
       } finally {
-        this.setSubmitState(false, this.form);
+        this.setSubmitState(false, this.resetForm || this.form);
       }
     }
 
@@ -447,11 +466,10 @@
       };
 
       // Password tab form
-      bindSubmit(this.form, () => {
-        this.activePanel = this.readActivePanel();
-        if (this.activePanel === "reset") return this.handleForgotPassword();
-        return this.handlePasswordSubmit();
-      });
+      bindSubmit(this.form, () => this.handlePasswordSubmit());
+
+      // Reset panel form
+      bindSubmit(this.resetForm, () => this.handleForgotPassword());
 
       // Code tab: identifier step form → send code
       bindSubmit(this.identifierForm, () => this.handleSendCode());
@@ -474,7 +492,7 @@
       if (this.resetLink) {
         this.resetLink.addEventListener("click", (e) => {
           e.preventDefault();
-          this.activePanel = "reset";
+          this.showResetPanel();
         });
       }
 
@@ -494,8 +512,7 @@
       this.container.addEventListener("click", (e) => {
         if (e.target.closest("[data-back-to-login]")) {
           e.preventDefault();
-          this.codeStep = "identifier";
-          this.activePanel = "password";
+          this.showPasswordPanel();
         }
       });
 
