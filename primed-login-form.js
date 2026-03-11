@@ -322,7 +322,11 @@
       this.setSubmitState(true, this.otpForm);
 
       try {
-        await Shared.ensureCsrfCookie();
+        // Force a fresh CSRF fetch — the server may have rotated the token after /send-code.
+        await fetch(Shared.resolveEndpoint(Shared.CONFIG.SANCTUM_CSRF_ENDPOINT_MAP), {
+          method: "GET",
+          credentials: "include"
+        });
         const xsrf = Shared.getCookie("XSRF-TOKEN");
 
         const res = await fetch(Shared.resolveEndpoint(Shared.CONFIG.VALIDATE_CODE_ENDPOINT_MAP), {
