@@ -16,11 +16,11 @@
       this.submitBtn = container.querySelector("input[type='submit']");
       this.resetLink = container.querySelector(".field-label-wrapper .text-style-link");
 
-      this.state = Shared.loginUiState.get();
-      this.activePanel = this.state.activePanel;
-      this.codeStep = this.state.codeStep;
-      this.codeIdentifier = this.state.codeIdentifier;
-      this.codeType = this.state.codeType;
+      const state = Shared.loginUiState.get();
+      this.codeStep = state.codeStep || "identifier";
+      this.codeIdentifier = state.codeIdentifier || "";
+      this.codeType = state.codeType || "";
+      this.activePanel = "password";
     }
 
     init() {
@@ -29,10 +29,21 @@
         return;
       }
 
-      this.injectPanels();
+      this.passInput.type = "password";
       this.cacheMessages();
       this.bindEvents();
       this.restore();
+    }
+
+    // Returns "password", "code", or "reset" based on the active Webflow tab or data attribute.
+    // Reads the tab link that has data-toggle set and is currently active (w--current),
+    // or falls back to any element with data-login-active-panel on the container.
+    readActivePanel() {
+      const activeTab = this.container.querySelector("[data-toggle].w--current");
+      if (activeTab && activeTab.dataset.toggle) return activeTab.dataset.toggle;
+      const declared = this.container.dataset.loginActivePanel;
+      if (declared) return declared;
+      return "password";
     }
 
     cacheMessages() {
@@ -53,7 +64,6 @@
 
     syncUiState() {
       Shared.loginUiState.set({
-        activePanel: this.activePanel,
         codeStep: this.codeStep,
         codeIdentifier: this.codeIdentifier,
         codeType: this.codeType
@@ -77,11 +87,7 @@
 
       Shared.showOnlyView(pageState.activeView === "login" ? "login" : "register");
 
-      this.switchPanel(this.activePanel, true);
-
-      this.codeIdentifier = this.state.codeIdentifier || "";
-      this.codeType = this.state.codeType || "";
-      this.codeStep = this.state.codeStep || "identifier";
+      this.activePanel = this.readActivePanel();
 
       if (this.activePanel === "code") {
         const identifierInput = this.form.querySelector("[data-login-identifier]");
@@ -89,29 +95,19 @@
           identifierInput.value = this.codeIdentifier;
         }
         this.switchCodeStep(this.codeStep, true);
-      } else {
-        this.switchCodeStep("identifier", true);
       }
 
-      this.syncUiState();
+      this.setSubmitState(false);
     }
 
     showLogin() {
-      Shared.pageState.patch({
-        activeView: "login",
-        userId: "",
-        dashboardUrl: ""
-      });
+      Shared.pageState.patch({ activeView: "login", userId: "", dashboardUrl: "" });
       Shared.showOnlyView("login");
       this.emailInput.focus();
     }
 
     showRegister() {
-      Shared.pageState.patch({
-        activeView: "register",
-        userId: "",
-        dashboardUrl: ""
-      });
+      Shared.pageState.patch({ activeView: "register", userId: "", dashboardUrl: "" });
       Shared.showOnlyView("register");
     }
 
@@ -155,25 +151,18 @@
 
       if (loading) {
         this.submitBtn.value =
-          this.activePanel === "password"
-            ? "Logging in..."
-            : this.activePanel === "reset"
-            ? "Sending..."
-            : this.codeStep === "identifier"
-            ? "Sending..."
-            : "Verifying...";
+          this.activePanel === "password" ? "Logging in..." :
+          this.activePanel === "reset"    ? "Sending..." :
+          this.codeStep === "identifier"  ? "Sending..." : "Verifying...";
       } else {
         this.submitBtn.value =
-          this.activePanel === "password"
-            ? "Login"
-            : this.activePanel === "reset"
-            ? "Send Reset Link"
-            : this.codeStep === "identifier"
-            ? "Send Code"
-            : "Verify Code";
+          this.activePanel === "password" ? "Login" :
+          this.activePanel === "reset"    ? "Send Reset Link" :
+          this.codeStep === "identifier"  ? "Send Code" : "Verify Code";
       }
     }
 
+    // Shows/hides the identifier vs OTP step within the code tab pane.
     switchCodeStep(step, skipSave) {
       this.codeStep = step;
 
@@ -189,47 +178,6 @@
       }
 
       this.setSubmitState(false);
-      if (!skipSave) this.syncUiState();
-    }
-
-    switchPanel(panel, skipSave) {
-      this.activePanel = panel;
-
-      this.container.querySelectorAll("[data-login-panel]").forEach((el) => {
-        const isActive = el.dataset.loginPanel === panel;
-        el.classList.toggle("lf-active", isActive);
-
-        el.querySelectorAll("input, select, textarea").forEach((input) => {
-          if (isActive) {
-            if (input.dataset.wasRequired === "true") input.required = true;
-          } else {
-            if (input.required) input.dataset.wasRequired = "true";
-            input.required = false;
-          }
-        });
-      });
-
-      const registerBtnWrapper = this.container.querySelector("[data-login-register-btn-wrapper]");
-      const isReset = panel === "reset";
-
-      if (registerBtnWrapper) registerBtnWrapper.style.display = isReset ? "none" : "";
-
-      if (panel === "code") {
-        this.switchCodeStep(this.codeStep || "identifier", true);
-      }
-
-      if (panel === "reset") {
-        const resetEmail = this.form.querySelector("[data-reset-email]");
-        if (resetEmail) resetEmail.focus();
-      }
-
-      this.container.querySelectorAll(".form_toggle-btn").forEach((btn) => {
-        btn.classList.toggle("is-active", btn.dataset.toggle === panel);
-      });
-
-      this.hideMessages();
-      this.setSubmitState(false);
-
       if (!skipSave) this.syncUiState();
     }
 
@@ -269,11 +217,7 @@
 
         await Shared.setUserSessionCookie();
         Shared.loginUiState.clear();
-        Shared.pageState.patch({
-          activeView: "login",
-          userId: "",
-          dashboardUrl: ""
-        });
+        Shared.pageState.patch({ activeView: "login", userId: "", dashboardUrl: "" });
 
         this.showMessage("success", "Logged in successfully.");
         window.location.href =
@@ -408,11 +352,7 @@
 
         await Shared.setUserSessionCookie();
         Shared.loginUiState.clear();
-        Shared.pageState.patch({
-          activeView: "login",
-          userId: "",
-          dashboardUrl: ""
-        });
+        Shared.pageState.patch({ activeView: "login", userId: "", dashboardUrl: "" });
 
         this.showMessage("success", "Logged in successfully.");
         window.location.href =
@@ -491,6 +431,7 @@
         e.stopPropagation();
         e.stopImmediatePropagation();
 
+        this.activePanel = this.readActivePanel();
         this.hideMessages();
 
         try {
@@ -512,19 +453,21 @@
         return false;
       }, true);
 
-      this.container.querySelectorAll(".form_toggle-btn").forEach((btn) => {
+      // Track active panel when Webflow tab links (with data-toggle) are clicked.
+      this.container.querySelectorAll("[data-toggle]").forEach((btn) => {
         btn.addEventListener("click", () => {
-          if (btn.dataset.toggle === "password") {
-            this.codeStep = "identifier";
-          }
-          this.switchPanel(btn.dataset.toggle);
+          this.activePanel = btn.dataset.toggle;
+          if (this.activePanel === "password") this.codeStep = "identifier";
+          this.setSubmitState(false);
+          this.hideMessages();
         });
       });
 
       if (this.resetLink) {
         this.resetLink.addEventListener("click", (e) => {
           e.preventDefault();
-          this.switchPanel("reset");
+          this.activePanel = "reset";
+          this.setSubmitState(false);
         });
       }
 
@@ -532,7 +475,8 @@
         if (e.target.closest("[data-back-to-login]")) {
           e.preventDefault();
           this.codeStep = "identifier";
-          this.switchPanel("password");
+          this.activePanel = "password";
+          this.setSubmitState(false);
           return;
         }
 
@@ -565,85 +509,6 @@
           });
         });
       }
-    }
-
-    injectPanels() {
-      this.passInput.type = "password";
-
-      if (!document.getElementById("lf-panel-style")) {
-        const style = document.createElement("style");
-        style.id = "lf-panel-style";
-        style.textContent =
-          "[data-login-panel] { display: none !important; } " +
-          "[data-login-panel].lf-active { display: block !important; }";
-        document.head.appendChild(style);
-      }
-
-      const passwordPanel = document.createElement("div");
-      passwordPanel.setAttribute("data-login-panel", "password");
-      passwordPanel.style.display = "none";
-
-      const emailWrapper = this.emailInput.closest(".form_field-wrapper");
-      const passWrapper = this.passInput.closest(".form_field-wrapper");
-
-      emailWrapper.parentNode.insertBefore(passwordPanel, emailWrapper);
-      passwordPanel.appendChild(emailWrapper);
-      passwordPanel.appendChild(passWrapper);
-
-      const codePanel = document.createElement("div");
-      codePanel.setAttribute("data-login-panel", "code");
-      codePanel.style.display = "none";
-      codePanel.innerHTML = `
-        <div data-code-step="identifier">
-          <div class="form_field-wrapper">
-            <div class="form_field-label">Email or Phone Number</div>
-            <input class="form_input w-input" maxlength="256" name="login-identifier" placeholder="Email or phone number" type="text" data-login-identifier="true"/>
-            <div data-login-identifier-error="true" style="display:none; color:#e53e3e; font-size:0.875rem; margin-top:0.25rem;"></div>
-          </div>
-        </div>
-        <div data-code-step="otp" style="display:none;">
-          <div class="form_field-wrapper">
-            <div class="form_field-label">Enter the code sent to you</div>
-            <input class="form_input w-input" maxlength="10" name="login-otp" placeholder="6-digit code" type="text" inputmode="numeric" autocomplete="one-time-code" data-login-otp="true"/>
-            <div data-login-otp-error="true" style="display:none; color:#e53e3e; font-size:0.875rem; margin-top:0.25rem;"></div>
-          </div>
-          <div style="margin-bottom:0.5rem;">
-            <a href="#" class="text-style-link text-size-small" data-resend-code="true">Resend code</a>
-          </div>
-        </div>
-      `;
-      passwordPanel.after(codePanel);
-
-      const resetPanel = document.createElement("div");
-      resetPanel.setAttribute("data-login-panel", "reset");
-      resetPanel.style.display = "none";
-      resetPanel.innerHTML = `
-        <div class="margin-bottom margin-small">
-          <p class="text-size-small" style="margin-bottom:0.75rem;">
-            Enter your email and we'll send you a reset link.
-          </p>
-        </div>
-        <div class="form_field-wrapper">
-          <div class="form_field-label">Email</div>
-          <input class="form_input w-input" maxlength="256" name="reset-email" placeholder="" type="email" data-reset-email="true"/>
-          <div data-reset-email-error="true" style="display:none; color:#e53e3e; font-size:0.875rem; margin-top:0.25rem;"></div>
-        </div>
-        <div style="margin-bottom:0.75rem;">
-          <a href="#" class="text-style-link text-size-small" data-back-to-login="true">← Back to login</a>
-        </div>
-      `;
-      codePanel.after(resetPanel);
-
-      const registerBtnWrapper = document.createElement("div");
-      registerBtnWrapper.setAttribute("data-login-register-btn-wrapper", "");
-      const submitGrid = this.submitBtn.closest(".w-layout-grid") || this.submitBtn.parentNode;
-      const wfParagraph = Array.from(this.form.querySelectorAll("p.text-size-small")).find((el) => !el.closest("[data-login-panel]"));
-      const marginBottom = wfParagraph && wfParagraph.closest(".margin-bottom");
-      const buttonGroup = Array.from(this.form.querySelectorAll(".button-group")).find((el) => !el.closest("[data-login-panel]"));
-
-      submitGrid.after(registerBtnWrapper);
-      if (marginBottom) registerBtnWrapper.appendChild(marginBottom);
-      if (buttonGroup) registerBtnWrapper.appendChild(buttonGroup);
     }
   }
 
