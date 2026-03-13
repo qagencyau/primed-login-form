@@ -65,19 +65,15 @@
     }
 
     cacheMessages() {
-      this.successWrapper = this.container.querySelector(".form_message-success-wrapper");
-      this.errorWrapper = this.container.querySelector(".form_message-error-wrapper");
-      this.successText = this.container.querySelector(".success-text");
-      this.errorText = this.container.querySelector(".error-text");
-
-      if (this.successWrapper) {
-        this.successWrapper.style.display = "none";
-        this.successWrapper.classList.remove("w-form-done");
-      }
-      if (this.errorWrapper) {
-        this.errorWrapper.style.display = "none";
-        this.errorWrapper.classList.remove("w-form-fail");
-      }
+      // Hide all success/error wrappers on init — each is shown per-scope at runtime
+      this.container.querySelectorAll(".form_message-success-wrapper").forEach(el => {
+        el.style.display = "none";
+        el.classList.remove("w-form-done");
+      });
+      this.container.querySelectorAll(".form_message-error-wrapper").forEach(el => {
+        el.style.display = "none";
+        el.classList.remove("w-form-fail");
+      });
     }
 
     syncUiState() {
@@ -140,39 +136,34 @@
       Shared.showOnlyView("register");
     }
 
-    showMessage(type, text) {
+    showMessage(type, text, scope) {
+      const root = scope || this.container;
+      const successWrapper = root.querySelector(".form_message-success-wrapper");
+      const errorWrapper = root.querySelector(".form_message-error-wrapper");
+      const successText = root.querySelector(".success-text");
+      const errorText = root.querySelector(".error-text");
+
       if (type === "success") {
-        if (this.errorWrapper) {
-          this.errorWrapper.style.display = "none";
-          this.errorWrapper.classList.remove("w-form-fail");
-        }
-        if (this.successWrapper) {
-          this.successWrapper.style.display = "block";
-          this.successWrapper.classList.add("w-form-done");
-        }
-        if (this.successText) this.successText.textContent = text;
+        if (errorWrapper) { errorWrapper.style.display = "none"; errorWrapper.classList.remove("w-form-fail"); }
+        if (successWrapper) { successWrapper.style.display = "block"; successWrapper.classList.add("w-form-done"); }
+        if (successText) successText.textContent = text;
       } else {
-        if (this.successWrapper) {
-          this.successWrapper.style.display = "none";
-          this.successWrapper.classList.remove("w-form-done");
-        }
-        if (this.errorWrapper) {
-          this.errorWrapper.style.display = "block";
-          this.errorWrapper.classList.add("w-form-fail");
-        }
-        if (this.errorText) this.errorText.textContent = text;
+        if (successWrapper) { successWrapper.style.display = "none"; successWrapper.classList.remove("w-form-done"); }
+        if (errorWrapper) { errorWrapper.style.display = "block"; errorWrapper.classList.add("w-form-fail"); }
+        if (errorText) errorText.textContent = text;
       }
     }
 
-    hideMessages() {
-      if (this.successWrapper) {
-        this.successWrapper.style.display = "none";
-        this.successWrapper.classList.remove("w-form-done");
-      }
-      if (this.errorWrapper) {
-        this.errorWrapper.style.display = "none";
-        this.errorWrapper.classList.remove("w-form-fail");
-      }
+    hideMessages(scope) {
+      const root = scope || this.container;
+      root.querySelectorAll(".form_message-success-wrapper").forEach(el => {
+        el.style.display = "none";
+        el.classList.remove("w-form-done");
+      });
+      root.querySelectorAll(".form_message-error-wrapper").forEach(el => {
+        el.style.display = "none";
+        el.classList.remove("w-form-fail");
+      });
     }
 
     setSubmitState(loading, form) {
@@ -202,7 +193,7 @@
       const password = this.passInput.value || "";
 
       if (!email || !password) {
-        this.showMessage("error", "Please enter your email and password.");
+        this.showMessage("error", "Please enter your email and password.", this.passwordFormBlock);
         return;
       }
 
@@ -224,9 +215,8 @@
         if (!res.ok) {
           this.showMessage(
             "error",
-            (data && data.message) ||
-            (data && data.error) ||
-            "Login failed. Please check your details and try again."
+            (data && data.message) || (data && data.error) || "Login failed. Please check your details and try again.",
+            this.passwordFormBlock
           );
           return;
         }
@@ -235,12 +225,12 @@
         Shared.loginUiState.clear();
         Shared.pageState.patch({ activeView: "login", userId: "", dashboardUrl: "" });
 
-        this.showMessage("success", "Logged in successfully.");
+        this.showMessage("success", "Logged in successfully.", this.passwordFormBlock);
         window.location.href =
           Shared.safeRedirectUrl(data && data.panel && data.panel.url) ||
           Shared.getLoginRedirectUrl();
       } catch (err) {
-        this.showMessage("error", (err && err.message) || "Login failed due to a network error.");
+        this.showMessage("error", (err && err.message) || "Login failed due to a network error.", this.passwordFormBlock);
         console.error("[LoginForm] Login error:", err);
       } finally {
         this.setSubmitState(false, this.form);
@@ -293,9 +283,8 @@
         if (!res.ok) {
           this.showMessage(
             "error",
-            (data && data.message) ||
-            (data && data.error) ||
-            "Failed to send code. Please try again."
+            (data && data.message) || (data && data.error) || "Failed to send code. Please try again.",
+            this.identifierStep
           );
           return;
         }
@@ -303,10 +292,10 @@
         this.codeIdentifier = raw;
         this.codeType = type;
         this.syncUiState();
-        this.hideMessages();
+        this.hideMessages(this.identifierStep);
         this.switchCodeStep("otp");
       } catch (err) {
-        this.showMessage("error", (err && err.message) || "Failed to send code due to a network error.");
+        this.showMessage("error", (err && err.message) || "Failed to send code due to a network error.", this.identifierStep);
         console.error("[LoginForm] Send code error:", err);
       } finally {
         this.setSubmitState(false, this.identifierForm);
@@ -376,12 +365,12 @@
         Shared.loginUiState.clear();
         Shared.pageState.patch({ activeView: "login", userId: "", dashboardUrl: "" });
 
-        this.showMessage("success", "Logged in successfully.");
+        this.showMessage("success", "Logged in successfully.", this.otpStep);
         window.location.href =
           Shared.safeRedirectUrl(data && data.panel && data.panel.url) ||
           Shared.getLoginRedirectUrl();
       } catch (err) {
-        this.showMessage("error", (err && err.message) || "Verification failed due to a network error.");
+        this.showMessage("error", (err && err.message) || "Verification failed due to a network error.", this.otpStep);
         console.error("[LoginForm] Validate code error:", err);
       } finally {
         this.setSubmitState(false, this.otpForm);
@@ -430,16 +419,15 @@
         if (!res.ok) {
           this.showMessage(
             "error",
-            (data && data.message) ||
-            (data && data.error) ||
-            "Failed to send reset link. Please try again."
+            (data && data.message) || (data && data.error) || "Failed to send reset link. Please try again.",
+            this.resetPanel
           );
           return;
         }
 
-        this.showMessage("success", "If an account exists for that email, a password reset link has been sent.");
+        this.showMessage("success", "If an account exists for that email, a password reset link has been sent.", this.resetPanel);
       } catch (err) {
-        this.showMessage("error", (err && err.message) || "Failed to send reset link due to a network error.");
+        this.showMessage("error", (err && err.message) || "Failed to send reset link due to a network error.", this.resetPanel);
         console.error("[LoginForm] Forgot password error:", err);
       } finally {
         this.setSubmitState(false, this.resetForm || this.form);
@@ -447,35 +435,35 @@
     }
 
     bindEvents() {
-      const bindSubmit = (form, handler) => {
+      const bindSubmit = (form, handler, scope) => {
         if (!form) return;
         form.setAttribute("novalidate", "novalidate");
         form.addEventListener("submit", async (e) => {
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
-          this.hideMessages();
+          this.hideMessages(scope);
           try {
             await handler();
           } catch (err) {
             console.error("[LoginForm] Submit error:", err);
-            this.showMessage("error", "Something went wrong. Please try again.");
+            this.showMessage("error", "Something went wrong. Please try again.", scope);
           }
           return false;
         }, true);
       };
 
-      // Password tab form
-      bindSubmit(this.form, () => this.handlePasswordSubmit());
+      // Password tab form — scope to the password form's .w-form block
+      bindSubmit(this.form, () => this.handlePasswordSubmit(), this.passwordFormBlock);
 
-      // Reset panel form
-      bindSubmit(this.resetForm, () => this.handleForgotPassword());
+      // Reset panel form — scope to [data-login-panel="reset"]
+      bindSubmit(this.resetForm, () => this.handleForgotPassword(), this.resetPanel);
 
-      // Code tab: identifier step form → send code
-      bindSubmit(this.identifierForm, () => this.handleSendCode());
+      // Code tab: identifier step form — scope to [data-code-step="identifier"]
+      bindSubmit(this.identifierForm, () => this.handleSendCode(), this.identifierStep);
 
-      // Code tab: OTP step form → validate code
-      bindSubmit(this.otpForm, () => this.handleValidateCode());
+      // Code tab: OTP step form — scope to [data-code-step="otp"]
+      bindSubmit(this.otpForm, () => this.handleValidateCode(), this.otpStep);
 
       // Track active panel when Webflow tab links (with data-toggle) are clicked.
       this.container.querySelectorAll("[data-toggle]").forEach((btn) => {
@@ -485,7 +473,8 @@
             this.codeStep = "identifier";
             this.switchCodeStep("identifier", true);
           }
-          this.hideMessages();
+          // Hide all messages across all scopes when switching tabs
+          this.hideMessages(this.container);
         });
       });
 
